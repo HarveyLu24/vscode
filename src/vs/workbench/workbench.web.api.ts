@@ -16,6 +16,7 @@ import { IUpdateProvider, IUpdate } from 'vs/workbench/services/update/browser/u
 import { Event, Emitter } from 'vs/base/common/event';
 import { Disposable, IDisposable } from 'vs/base/common/lifecycle';
 import { IWorkspaceProvider, IWorkspace } from 'vs/workbench/services/host/browser/browserHostService';
+import { CommandsRegistry, ICommandHandler } from 'vs/platform/commands/common/commands';
 
 interface IResourceUriProvider {
 	(uri: URI): URI;
@@ -36,16 +37,22 @@ interface IExternalUriResolver {
 
 interface TunnelOptions {
 	remoteAddress: { port: number, host: string };
-	// The desired local port. If this port can't be used, then another will be chosen.
+	/**
+	 * The desired local port. If this port can't be used, then another will be chosen.
+	 */
 	localAddressPort?: number;
 	label?: string;
 }
 
 interface Tunnel {
 	remoteAddress: { port: number, host: string };
-	//The complete local address(ex. localhost:1234)
+	/**
+	 * The complete local address(ex. localhost:1234)
+	 */
 	localAddress: string;
-	// Implementers of Tunnel should fire onDidDispose when dispose is called.
+	/**
+	 * Implementers of Tunnel should fire onDidDispose when dispose is called.
+	 */
 	onDidDispose: Event<void>;
 	dispose(): void;
 }
@@ -149,14 +156,37 @@ interface IWorkbenchConstructionOptions {
 	readonly driver?: boolean;
 }
 
+interface IWorkbench {
+
+	/**
+	 * Register a command with the provided identifier and handler. The
+	 * handler has access to all services of the workbench, e.g.:
+	 *
+	 * ```ts
+	 * const editorService = accessor.get(IEditorService);
+	 * ?!??
+	 * ```
+	 */
+	registerCommand(id: string, command: ICommandHandler): IDisposable;
+}
+
 /**
  * Creates the workbench with the provided options in the provided container.
  *
  * @param domElement the container to create the workbench in
  * @param options for setting up the workbench
  */
-function create(domElement: HTMLElement, options: IWorkbenchConstructionOptions): Promise<void> {
-	return main(domElement, options);
+async function create(domElement: HTMLElement, options: IWorkbenchConstructionOptions): Promise<IWorkbench> {
+
+	// Startup workbench
+	await main(domElement, options);
+
+	// Return facade
+	return {
+		registerCommand: (id: string, command: ICommandHandler): IDisposable => {
+			return CommandsRegistry.registerCommand(id, command);
+		}
+	};
 }
 
 export {
@@ -164,6 +194,7 @@ export {
 	// Factory
 	create,
 	IWorkbenchConstructionOptions,
+	IWorkbench,
 
 	// Basic Types
 	URI,
@@ -172,6 +203,9 @@ export {
 	Emitter,
 	IDisposable,
 	Disposable,
+
+	// Workbench Facade
+	ICommandHandler,
 
 	// Workspace
 	IWorkspace,
